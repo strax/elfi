@@ -215,11 +215,11 @@ class BayesianOptimization(ParameterInference):
         # Filter out results with non-finite values
         target_batch_mask = np.isfinite(target_batch)
         if np.any(~target_batch_mask):
-            logger.warning("batch contains non-finite values")
+            logger.debug("batch contains non-finite values")
             target_batch = target_batch[target_batch_mask]
         batch_size = np.count_nonzero(target_batch_mask)
         if batch_size == 0:
-            logger.debug("batch is empty, skipping update")
+            logger.info("batch is empty, skipping update")
             return
 
         self.state['n_evidence'] += batch_size

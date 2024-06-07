@@ -9,6 +9,7 @@ import scipy.stats as ss
 import elfi.methods.mcmc as mcmc
 from elfi.methods.bo.utils import minimize
 from elfi.methods.utils import resolve_sigmas
+from elfi.methods.bo.pfe import PFEstimator
 
 logger = logging.getLogger(__name__)
 
@@ -833,3 +834,28 @@ class UniformAcquisition(AcquisitionBase):
         bounds = np.stack(self.model.bounds)
         return ss.uniform(bounds[:, 0], bounds[:, 1] - bounds[:, 0]) \
             .rvs(size=(n, self.model.input_dim), random_state=self.random_state)
+
+class PF(AcquisitionBase):
+    def __init__(self, inner: AcquisitionBase, estimator: PFEstimator):
+        super(PF, self).__init__(
+            inner.model,
+            prior=inner.prior,
+            n_inits=inner.n_inits,
+            max_opt_iters=inner.max_opt_iters,
+            noise_var=inner.noise_var,
+            exploration_rate=inner.exploration_rate,
+            constraints=inner.constraints
+        )
+        self.inner = inner
+        self.estimator = estimator
+
+    def evaluate(self, x, t):
+        score = self.inner.evaluate(x, t)
+        p_success = 1 - self.estimator.predict(x, t)
+        if score < 0:
+            p_success = 1 - p_success
+        return score * p_success
+
+    def evaluate_gradient(self, x, t=None):
+        # TODO: Support differentiable failure estimators, such as GPCs
+        return None

@@ -11,7 +11,7 @@ import elfi.methods.mcmc as mcmc
 import elfi.visualization.interactive as visin
 import elfi.visualization.visualization as vis
 from elfi.loader import get_sub_seed
-from elfi.methods.bo.acquisition import LCBSC
+from elfi.methods.bo.acquisition import LCBSC, PF
 from elfi.methods.bo.gpy_regression import GPyRegression
 from elfi.methods.bo.utils import stochastic_optimization
 from elfi.methods.inference.parameter_inference import ParameterInference
@@ -38,6 +38,7 @@ class BayesianOptimization(ParameterInference):
                  exploration_rate=10,
                  batch_size=1,
                  batches_per_acquisition=None,
+                 failure_model=None,
                  async_acq=False,
                  **kwargs):
         """Initialize Bayesian optimization.
@@ -105,6 +106,9 @@ class BayesianOptimization(ParameterInference):
                                                               noise_var=acq_noise_var,
                                                               exploration_rate=exploration_rate,
                                                               seed=self.seed)
+        
+        if failure_model is not None:
+            self.acquisition_method = PF(self.acquisition_method, failure_model)
 
         self.n_initial_evidence = n_initial
         self.n_precomputed_evidence = n_precomputed

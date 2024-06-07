@@ -210,13 +210,25 @@ class BayesianOptimization(ParameterInference):
 
         """
         super(BayesianOptimization, self).update(batch, batch_index)
-        self.state['n_evidence'] += self.batch_size
+        target_batch = batch[self.target_name]
+
+        # Filter out results with non-finite values
+        target_batch_mask = np.isfinite(target_batch)
+        if np.any(~target_batch_mask):
+            logger.warning("batch contains non-finite values")
+            target_batch = target_batch[target_batch_mask]
+        batch_size = np.count_nonzero(target_batch_mask)
+        if batch_size == 0:
+            logger.debug("batch is empty, skipping update")
+            return
+
+        self.state['n_evidence'] += batch_size
 
         params = batch_to_arr2d(batch, self.target_model.parameter_names)
-        self._report_batch(batch_index, params, batch[self.target_name])
+        self._report_batch(batch_index, params, target_batch)
 
         optimize = self._should_optimize()
-        self.target_model.update(params, batch[self.target_name], optimize)
+        self.target_model.update(params, target_batch, optimize)
         if optimize:
             self.state['last_GP_update'] = self.target_model.n_evidence
 

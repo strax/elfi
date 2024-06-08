@@ -50,7 +50,7 @@ class BayesianOptimization(ParameterInference):
             Only needed if model is an ElfiModel
         bounds : dict, optional
             The region where to estimate the posterior for each parameter in
-            model.parameters: dict('parameter_name':(lower, upper), ... )`. Not used if
+            model.parameters: `dict('parameter_name':(lower, upper), ... )`. Not used if
             custom target_model is given.
         initial_evidence : int, dict, optional
             Number of initial evidence or a precomputed batch dict containing parameter

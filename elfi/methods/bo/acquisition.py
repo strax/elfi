@@ -147,6 +147,16 @@ class AcquisitionBase:
         """
         logger.debug('Acquiring the next batch of %d values', n)
 
+        xhat = self._minimize(t)
+
+        # Create n copies of the minimum
+        x = np.tile(xhat, (n, 1))
+        # Add noise for more efficient fitting of GP
+        x = self._add_noise(x)
+
+        return x
+
+    def _minimize(self, t):
         # Optimize the current minimum
         def obj(x):
             return self.evaluate(x, t)
@@ -165,12 +175,7 @@ class AcquisitionBase:
             maxiter=self.max_opt_iters,
             random_state=self.random_state)
 
-        # Create n copies of the minimum
-        x = np.tile(xhat, (n, 1))
-        # Add noise for more efficient fitting of GP
-        x = self._add_noise(x)
-
-        return x
+        return xhat
 
     def _add_noise(self, x):
         # Add noise for more efficient fitting of GP
@@ -859,3 +864,10 @@ class PF(AcquisitionBase):
     def evaluate_gradient(self, x, t=None):
         # TODO: Support differentiable failure estimators, such as GPCs
         return None
+
+    def acquire(self, n, t=None):
+        logger.debug('Acquiring the next batch of %d values', n)
+
+        xhat = self._minimize(t)
+
+        return np.broadcast_to(xhat, (n, 1))

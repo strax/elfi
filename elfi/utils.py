@@ -5,6 +5,10 @@ import uuid
 import networkx as nx
 import numpy as np
 import scipy.stats as ss
+import logging
+
+from typing import Optional
+from contextlib import AbstractContextManager
 
 SCIPY_ALIASES = {
     'normal': 'norm',
@@ -125,3 +129,29 @@ def get_sub_seed(seed, sub_seed_index, high=2**31, cache=None):
         cache['seen'] = seen
 
     return sub_seeds[-1]
+
+class LoggingContext(AbstractContextManager):
+    """
+    Context manager for overriding `logging.Logger` configuration.
+    """
+    def __init__(self, logger: logging.Logger, *, level: Optional[int] = None, handler: Optional[logging.Handler] = None, close: bool = True):
+        self.logger = logger
+        self.level = level
+        self.handler = handler
+        self.close = close
+
+    def __enter__(self):
+        if self.level != None:
+            self.previous_level = self.logger.level
+            self.logger.setLevel(self.level)
+        if self.handler != None:
+            self.logger.addHandler(self.handler)
+
+    def __exit__(self, *args):
+        del args
+        if self.previous_level != None:
+            self.logger.setLevel(self.previous_level)
+        if self.handler != None:
+            self.logger.removeHandler(self.handler)
+            if self.close:
+                self.handler.close()

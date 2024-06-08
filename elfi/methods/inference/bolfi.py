@@ -19,6 +19,7 @@ from elfi.methods.posteriors import BolfiPosterior
 from elfi.methods.results import BolfiSample, OptimizationResult
 from elfi.methods.utils import arr2d_to_batch, batch_to_arr2d, ceil_to_batch_size, resolve_sigmas
 from elfi.model.extensions import ModelPrior
+from elfi.utils import LoggingContext
 
 logger = logging.getLogger(__name__)
 
@@ -430,7 +431,7 @@ class BOLFI(BayesianOptimization):
 
     """
 
-    def fit(self, n_evidence, threshold=None, bar=True):
+    def fit(self, n_evidence, threshold=None, bar=True, verbose=False):
         """Fit the surrogate model.
 
         Generates a regression model for the discrepancy given the parameters.
@@ -445,15 +446,18 @@ class BOLFI(BayesianOptimization):
             Discrepancy threshold for creating the posterior (log with log discrepancy).
         bar : bool, optional
             Flag to remove (False) the progress bar from output.
+        verbose : bool, optional
+            Flag to enable debug logging during fitting.
 
         """
-        logger.info("BOLFI: Fitting the surrogate model...")
-        if n_evidence is None:
-            raise ValueError(
-                'You must specify the number of evidence (n_evidence) for the fitting')
+        with LoggingContext(logger, level=logging.DEBUG if verbose else None):
+            logger.info("BOLFI: Fitting the surrogate model...")
+            if n_evidence is None:
+                raise ValueError(
+                    'You must specify the number of evidence (n_evidence) for the fitting')
 
-        self.infer(n_evidence, bar=bar)
-        return self.extract_posterior(threshold)
+            self.infer(n_evidence, bar=bar)
+            return self.extract_posterior(threshold)
 
     def extract_posterior(self, threshold=None):
         """Return an object representing the approximate posterior.

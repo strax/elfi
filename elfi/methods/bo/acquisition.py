@@ -853,13 +853,16 @@ class PF(AcquisitionBase):
         )
         self.inner = inner
         self.estimator = estimator
+        self.current_minimum = -np.inf
 
     def evaluate(self, x, t):
-        score = self.inner.evaluate(x, t)
-        p_success = 1 - self.estimator.predict(x, t)
-        if score < 0:
-            p_success = 1 - p_success
-        return score * p_success
+        yhat = self.inner.evaluate(x, t)
+        ymin = self.current_minimum
+        if yhat < ymin:
+            p_failure = self.estimator.predict(x, t)
+            return ymin - (ymin - yhat) * (1. - p_failure)
+        else:
+            return yhat
 
     def evaluate_gradient(self, x, t=None):
         # TODO: Support differentiable failure estimators, such as GPCs
@@ -869,5 +872,8 @@ class PF(AcquisitionBase):
         logger.debug('Acquiring the next batch of %d values', n)
 
         xhat = self._minimize(t)
+        self.current_minimum = self.evaluate(xhat, t)
+
+        logger.debug(f'Acquisition function minimum is at {xhat}, value={self.current_minimum}')
 
         return np.broadcast_to(xhat, (n, 1))

@@ -1,6 +1,5 @@
 import logging
 from abc import ABC, abstractmethod
-from scipy.stats.distributions import rv_continuous
 
 logger = logging.getLogger(__name__)
 
@@ -9,10 +8,10 @@ class PFEstimator(ABC):
     def predict(self, x, t):
         ...
 
-class FixedDistribution(PFEstimator):
-    def __init__(self, dist: rv_continuous):
-        self.dist = dist
-    
+class Oracle(PFEstimator):
+    def __init__(self, func):
+        self.func = func
+
     def predict(self, x, t):
         del t
-        return self.dist.pdf(x)
+        return self.func(x)

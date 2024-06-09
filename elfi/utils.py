@@ -139,6 +139,7 @@ class LoggingContext(AbstractContextManager):
         self.level = level
         self.handler = handler
         self.close = close
+        self.previous_level = None
 
     def __enter__(self):
         if self.level != None:

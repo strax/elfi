@@ -111,6 +111,7 @@ class BayesianOptimization(ParameterInference):
         if failure_model is not None:
             self.acquisition_method = PF(self.acquisition_method, failure_model)
 
+        self._failures = []
         self.n_initial_evidence = n_initial
         self.n_precomputed_evidence = n_precomputed
         self.update_interval = update_interval
@@ -154,6 +155,10 @@ class BayesianOptimization(ParameterInference):
     def n_evidence(self):
         """Return the number of acquired evidence points."""
         return self.state.get('n_evidence', 0)
+
+    @property
+    def failures(self):
+        return np.vstack(self._failures)
 
     @property
     def acq_batch_size(self):
@@ -219,17 +224,23 @@ class BayesianOptimization(ParameterInference):
 
         # Filter out results with non-finite values
         target_batch_mask = np.isfinite(target_batch)
-        if np.any(~target_batch_mask):
+        batch_has_failures = np.any(~target_batch_mask)
+        if batch_has_failures:
             logger.debug("Batch contains non-finite values")
             target_batch = target_batch[target_batch_mask]
         batch_size = np.count_nonzero(target_batch_mask)
+
+        params = batch_to_arr2d(batch, self.target_model.parameter_names)
+
+        if batch_has_failures:
+            self._failures.append(params)
+
+        self.state['n_evidence'] += batch_size
+
         if batch_size == 0:
             logger.info("Batch is empty, skipping update")
             return
 
-        self.state['n_evidence'] += batch_size
-
-        params = batch_to_arr2d(batch, self.target_model.parameter_names)
         self._report_batch(batch_index, params, target_batch)
 
         optimize = self._should_optimize()

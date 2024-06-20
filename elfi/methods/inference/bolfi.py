@@ -158,7 +158,10 @@ class BayesianOptimization(ParameterInference):
 
     @property
     def failures(self):
-        return np.vstack(self._failures)
+        if len(self._failures) > 0:
+            return np.vstack(self._failures)
+        else:
+            return np.array([])
 
     @property
     def acq_batch_size(self):

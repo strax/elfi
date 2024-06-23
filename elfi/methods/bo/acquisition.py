@@ -876,4 +876,4 @@ class PF(AcquisitionBase):
 
         logger.debug(f'Acquisition function minimum is at {xhat}, value={self.current_minimum}')
 
-        return np.broadcast_to(xhat, (n, 1))
+        return np.tile(xhat, (n, 1))

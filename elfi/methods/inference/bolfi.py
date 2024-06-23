@@ -508,6 +508,7 @@ class BOLFI(BayesianOptimization):
                algorithm='nuts',
                sigma_proposals=None,
                n_evidence=None,
+               verbose=True,
                **kwargs):
         r"""Sample the posterior distribution of BOLFI.
 
@@ -542,6 +543,8 @@ class BOLFI(BayesianOptimization):
             Markov Chain sampler. Defaults to 1/10 of surrogate model bound lengths.
         n_evidence : int
             If the regression model is not fitted yet, specify the amount of evidence
+        verbose : bool
+            Print sampler diagnostics to stdout.
 
         Returns
         -------
@@ -618,12 +621,13 @@ class BOLFI(BayesianOptimization):
             chains.append(self.client.get_result(id))
 
         chains = np.asarray(chains)
-        print(
-            "{} chains of {} iterations acquired. Effective sample size and Rhat for each "
-            "parameter:".format(n_chains, n_samples))
-        for ii, node in enumerate(self.target_model.parameter_names):
-            print(node, mcmc.eff_sample_size(chains[:, :, ii]),
-                  mcmc.gelman_rubin_statistic(chains[:, :, ii]))
+        if verbose:
+            print(
+                "{} chains of {} iterations acquired. Effective sample size and Rhat for each "
+                "parameter:".format(n_chains, n_samples))
+            for ii, node in enumerate(self.target_model.parameter_names):
+                print(node, mcmc.eff_sample_size(chains[:, :, ii]),
+                      mcmc.gelman_rubin_statistic(chains[:, :, ii]))
         self.target_model.is_sampling = False
 
         return BolfiSample(

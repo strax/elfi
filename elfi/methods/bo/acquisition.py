@@ -866,7 +866,7 @@ class PF(AcquisitionBase):
 
     def evaluate_gradient(self, x, t=None):
         # TODO: Support differentiable failure estimators, such as GPCs
-        return None
+        return np.zeros_like(x)
 
     def acquire(self, n, t=None):
         logger.debug('Acquiring the next batch of %d values', n)

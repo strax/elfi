@@ -157,8 +157,12 @@ class BayesianOptimization(ParameterInference):
         return self.state.get('n_evidence', 0)
 
     @property
+    def has_failures(self):
+        return len(self._failures) > 0
+
+    @property
     def failures(self):
-        if len(self._failures) > 0:
+        if self.has_failures:
             return np.vstack(self._failures)
         else:
             return np.array([])

@@ -1,16 +1,17 @@
 """Implementations for acquiring locations of new evidence for Bayesian optimization."""
 
 import logging
+from functools import partial
 
 import numpy as np
 import scipy.linalg as sl
 import scipy.stats as ss
 
 import elfi.methods.mcmc as mcmc
-from functools import partial
+from elfi.methods.bo.gpy_regression import GPyRegression
+from elfi.methods.bo.pfe import PFEstimator
 from elfi.methods.bo.utils import minimize
 from elfi.methods.utils import resolve_sigmas
-from elfi.methods.bo.pfe import PFEstimator
 
 logger = logging.getLogger(__name__)
 
@@ -848,11 +849,11 @@ class PF(AcquisitionBase):
         )
         self.inner = inner
         self.estimator = estimator
-        self.current_minimum = -np.inf
 
     def evaluate(self, x, t):
         yhat = self.inner.evaluate(x, t)
-        ymin = self.current_minimum
+        # FIXME: This is only valid if `evaluate` is called within `acquire`
+        ymin = self._current_minimum
         if yhat < ymin:
             p_failure = self.estimator.predict(x, t)
             return ymin - (ymin - yhat) * (1. - p_failure)
@@ -864,12 +865,26 @@ class PF(AcquisitionBase):
         # TODO: Support differentiable failure estimators, such as GPCs
         raise NotImplementedError()
 
+    def _compute_current_minimum(self):
+        if isinstance(self.model, GPyRegression):
+            _, ymin = minimize(
+                self.model.predict_mean,
+                self.model.bounds,
+                grad=self.model.predictive_gradient_mean,
+                prior=self.prior,
+                n_start_points=self.n_inits,
+                maxiter=self.max_opt_iters,
+                random_state=self.random_state)
+            self._current_minimum = ymin
+        else:
+            raise NotImplementedError()
+
     def acquire(self, n, t=None):
         logger.debug('Acquiring the next batch of %d values', n)
 
+        self._compute_current_minimum()
         xhat = self._minimize(t, differentiable=False)
-        self.current_minimum = self.evaluate(xhat, t)
 
-        logger.debug(f'Acquisition function minimum is at {xhat}, value={self.current_minimum}')
+        logger.debug(f'Acquisition function minimum is at {xhat}, value={self._current_minimum}')
 
         return np.tile(xhat, (n, 1))

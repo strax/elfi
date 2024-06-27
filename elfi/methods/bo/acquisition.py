@@ -7,6 +7,7 @@ import scipy.linalg as sl
 import scipy.stats as ss
 
 import elfi.methods.mcmc as mcmc
+from functools import partial
 from elfi.methods.bo.utils import minimize
 from elfi.methods.utils import resolve_sigmas
 from elfi.methods.bo.pfe import PFEstimator
@@ -156,20 +157,14 @@ class AcquisitionBase:
 
         return x
 
-    def _minimize(self, t):
+    def _minimize(self, t, *, differentiable=True):
         # Optimize the current minimum
-        def obj(x):
-            return self.evaluate(x, t)
-
-        def grad_obj(x):
-            return self.evaluate_gradient(x, t)
-
         xhat, _ = minimize(
-            obj,
+            partial(self.evaluate, t=t),
             self.model.bounds,
             method='L-BFGS-B' if self.constraints is None else 'SLSQP',
             constraints=self.constraints,
-            grad=grad_obj,
+            grad=partial(self.evaluate_gradient, t=t) if differentiable else None,
             prior=self.prior,
             n_start_points=self.n_inits,
             maxiter=self.max_opt_iters,
@@ -865,13 +860,14 @@ class PF(AcquisitionBase):
             return yhat
 
     def evaluate_gradient(self, x, t=None):
+        del x, t
         # TODO: Support differentiable failure estimators, such as GPCs
-        return np.zeros_like(x)
+        raise NotImplementedError()
 
     def acquire(self, n, t=None):
         logger.debug('Acquiring the next batch of %d values', n)
 
-        xhat = self._minimize(t)
+        xhat = self._minimize(t, differentiable=False)
         self.current_minimum = self.evaluate(xhat, t)
 
         logger.debug(f'Acquisition function minimum is at {xhat}, value={self.current_minimum}')

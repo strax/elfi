@@ -854,11 +854,12 @@ class PF(AcquisitionBase):
         yhat = self.inner.evaluate(x, t)
         # FIXME: This is only valid if `evaluate` is called within `acquire`
         ymin = self._current_minimum
-        if yhat < ymin:
-            p_failure = self.estimator.predict(x, t)
-            return ymin - (ymin - yhat) * (1. - p_failure)
-        else:
-            return yhat
+        p_failure = np.reshape(self.estimator.predict(x, t), np.shape(yhat))
+        return np.where(
+            yhat < ymin,
+            ymin - (ymin - yhat) * (1. - p_failure),
+            yhat
+        )
 
     def evaluate_gradient(self, x, t=None):
         del x, t

@@ -3,6 +3,7 @@
 __all__ = ['BayesianOptimization', 'BOLFI']
 
 import logging
+from functools import partial
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +12,8 @@ import elfi.methods.mcmc as mcmc
 import elfi.visualization.interactive as visin
 import elfi.visualization.visualization as vis
 from elfi.loader import get_sub_seed
-from elfi.methods.bo.acquisition import LCBSC, PF
+from elfi.methods.bo.acquisition import LCBSC, FeasibilityWeightedLCBSC
+from elfi.methods.bo.feasibility_estimation import FeasibilityEstimator
 from elfi.methods.bo.gpy_regression import GPyRegression
 from elfi.methods.bo.utils import stochastic_optimization
 from elfi.methods.inference.parameter_inference import ParameterInference
@@ -39,7 +41,7 @@ class BayesianOptimization(ParameterInference):
                  exploration_rate=10,
                  batch_size=1,
                  batches_per_acquisition=None,
-                 failure_model=None,
+                 feasibility_estimator: FeasibilityEstimator | None=None,
                  async_acq=False,
                  **kwargs):
         """Initialize Bayesian optimization.
@@ -102,14 +104,19 @@ class BayesianOptimization(ParameterInference):
         self.batches_per_acquisition = batches_per_acquisition or self.max_parallel_batches
 
         prior = ModelPrior(self.model, parameter_names=self.target_model.parameter_names)
-        self.acquisition_method = acquisition_method or LCBSC(self.target_model,
+
+        self.feasibility_estimator = feasibility_estimator
+        if feasibility_estimator is not None:
+            if acquisition_method is not None and not isinstance(acquisition_method, FeasibilityWeightedLCBSC):
+                raise TypeError("acquisition_method must be FeasibilityWeightedLCBSC when feasibility_estimator is given")
+            default_acquisition_method = partial(FeasibilityWeightedLCBSC, feasibility_estimator)
+        else:
+            default_acquisition_method = LCBSC
+        self.acquisition_method = acquisition_method or default_acquisition_method(self.target_model,
                                                               prior=prior,
                                                               noise_var=acq_noise_var,
                                                               exploration_rate=exploration_rate,
                                                               seed=self.seed)
-
-        if failure_model is not None:
-            self.acquisition_method = PF(self.acquisition_method, failure_model)
 
         self._failures = []
         self.n_initial_evidence = n_initial

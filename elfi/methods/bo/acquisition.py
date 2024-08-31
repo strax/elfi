@@ -8,8 +8,8 @@ import scipy.linalg as sl
 import scipy.stats as ss
 
 import elfi.methods.mcmc as mcmc
+from elfi.methods.bo.feasibility_estimation import FeasibilityEstimator
 from elfi.methods.bo.gpy_regression import GPyRegression
-from elfi.methods.bo.pfe import PFEstimator
 from elfi.methods.bo.utils import minimize
 from elfi.methods.utils import resolve_sigmas
 
@@ -836,28 +836,19 @@ class UniformAcquisition(AcquisitionBase):
         return ss.uniform(bounds[:, 0], bounds[:, 1] - bounds[:, 0]) \
             .rvs(size=(n, self.model.input_dim), random_state=self.random_state)
 
-class PF(AcquisitionBase):
-    def __init__(self, inner: AcquisitionBase, estimator: PFEstimator):
-        super(PF, self).__init__(
-            inner.model,
-            prior=inner.prior,
-            n_inits=inner.n_inits,
-            max_opt_iters=inner.max_opt_iters,
-            noise_var=inner.noise_var,
-            exploration_rate=inner.exploration_rate,
-            constraints=inner.constraints
-        )
-        self.inner = inner
+class FeasibilityWeightedLCBSC(LCBSC):
+    def __init__(self, estimator: FeasibilityEstimator, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.estimator = estimator
 
     def evaluate(self, x, t):
-        yhat = self.inner.evaluate(x, t)
+        yhat = super().evaluate(x, t)
         # FIXME: This is only valid if `evaluate` is called within `acquire`
         ymin = self._current_minimum
-        p_failure = np.reshape(self.estimator.predict(x, t), np.shape(yhat))
+        p_feasible = np.reshape(self.estimator.predict(x, t), np.shape(yhat))
         return np.where(
             yhat < ymin,
-            ymin - (ymin - yhat) * (1. - p_failure),
+            ymin - (ymin - yhat) * p_feasible,
             yhat
         )
 

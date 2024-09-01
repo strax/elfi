@@ -1,30 +1,11 @@
-import logging
-from abc import ABC, abstractmethod
-from numpy.testing import assert_equal
-from sklearn.gaussian_process import GaussianProcessClassifier
-from sklearn.utils.validation import check_is_fitted, NotFittedError
-
 import numpy as np
 
-logger = logging.getLogger(__name__)
+from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.utils.validation import check_is_fitted, NotFittedError
+from numpy.testing import assert_equal
 
-class FeasibilityEstimator(ABC):
-    @abstractmethod
-    def predict(self, x, t):
-        ...
+from . import FeasibilityEstimator
 
-    def update(self, params, batch):
-        pass
-
-class OracleFeasibilityEstimator(FeasibilityEstimator):
-    def __init__(self, func):
-        self.func = func
-
-    def predict(self, x, t):
-        del t
-        # x has shape (...batches, param) but simulators receive a tuple or ndarray with shape (param, ...batches), so swap the position of the param axis
-        x = np.swapaxes(x, -1, 0)
-        return np.float_(self.func(*x))
 
 class GPCFeasibilityEstimator(FeasibilityEstimator):
     _gpc: GaussianProcessClassifier
@@ -32,7 +13,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
     _y: np.ndarray | None
     _use_feasibility_threshold: bool
 
-    def __init__(self, *, use_feasibility_threshold = False):
+    def __init__(self, *, use_feasibility_threshold=False):
         self._gpc = GaussianProcessClassifier()
         self._X = None
         self._y = None
@@ -74,9 +55,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
         x = np.asarray(x)
         *batch_dims, input_dim = np.shape(x)
         if self._is_fitted:
-            p_feasible = self._gpc.predict_proba(x.reshape(-1, input_dim))[
-                :, 1
-            ]
+            p_feasible = self._gpc.predict_proba(x.reshape(-1, input_dim))[:, 1]
             p_feasible = p_feasible.reshape(*batch_dims, 1)
             if self._use_feasibility_threshold:
                 # If feasibility thresholding is enabled, we consider points that have p(feasible) >= 0.5
@@ -88,3 +67,6 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
             return p_feasible
         # We have not yet fitted the classifier, so we assume all points to be feasible.
         return np.broadcast_to(1.0, (*batch_dims, 1))
+
+
+__all__ = ["GPCFeasibilityEstimator"]

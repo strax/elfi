@@ -239,6 +239,10 @@ class BayesianOptimization(ParameterInference):
         """
         super(BayesianOptimization, self).update(batch, batch_index)
         target_batch = batch[self.target_name]
+        params = batch_to_arr2d(batch, self.target_model.parameter_names)
+
+        if self.feasibility_estimator is not None:
+            self.feasibility_estimator.update(params, target_batch)
 
         # Filter out results with non-finite values
         target_batch_mask = np.isfinite(target_batch)
@@ -248,7 +252,6 @@ class BayesianOptimization(ParameterInference):
             target_batch = target_batch[target_batch_mask]
         batch_size = np.count_nonzero(target_batch_mask)
 
-        params = batch_to_arr2d(batch, self.target_model.parameter_names)
 
         if batch_has_failures:
             self._failures.append(params)

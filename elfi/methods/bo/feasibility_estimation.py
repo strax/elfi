@@ -10,6 +10,9 @@ class FeasibilityEstimator(ABC):
     def predict(self, x, t):
         ...
 
+    def update(self, params, batch):
+        pass
+
 class OracleFeasibilityEstimator(FeasibilityEstimator):
     def __init__(self, func):
         self.func = func

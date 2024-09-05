@@ -858,6 +858,9 @@ class FeasibilityWeightedLCBSC(LCBSC):
             yhat
         )
 
+    def evaluate_unweighted(self, x, t):
+        return super().evaluate(x, t)
+
     def evaluate_gradient(self, x, t=None):
         del x, t
         # TODO: Support differentiable failure estimators, such as GPCs

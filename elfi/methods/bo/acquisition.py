@@ -843,11 +843,14 @@ class FeasibilityWeightedLCBSC(LCBSC):
     def __init__(self, estimator: FeasibilityEstimator, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.estimator = estimator
+        self._current_minimum = np.nan
 
     def evaluate(self, x, t):
         yhat = super().evaluate(x, t)
-        # FIXME: This is only valid if `evaluate` is called within `acquire`
+
         ymin = self._current_minimum
+        assert np.isfinite(ymin)
+
         p_feasible = np.reshape(self.estimator.predict(x, t), np.shape(yhat))
         return np.where(
             yhat < ymin,

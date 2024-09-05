@@ -158,7 +158,10 @@ class AcquisitionBase:
 
         return x
 
-    def _minimize(self, t, *, differentiable=True):
+    def _minimize(self, t, *, differentiable=True, random_state=None):
+        if random_state is None:
+            random_state = self.random_state
+
         # Optimize the current minimum
         xhat, _ = minimize(
             partial(self.evaluate, t=t),
@@ -169,7 +172,7 @@ class AcquisitionBase:
             prior=self.prior,
             n_start_points=self.n_inits,
             maxiter=self.max_opt_iters,
-            random_state=self.random_state)
+            random_state=random_state)
 
         return xhat
 

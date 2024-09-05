@@ -37,17 +37,17 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
             self._y = np.concatenate([self._y, y])
 
     def update(self, x, y):
-        # 1 = feasible, 0 = infeasible
-        f = np.where(np.isfinite(y), 1, 0).ravel()
+        # 1 = feasible, -1 = infeasible
+        f = np.where(np.isfinite(y), 1, -1).ravel()
 
         self._append_observed(x, f)
 
         # Check if we have seen both feasible and infeasible points as
         # GaussianProcessClassifier requires both to be present for fitting
-        if 0 < np.count_nonzero(self._y) < np.size(self._y):
+        if 0 < np.count_nonzero(self._y == 1) < np.size(self._y):
             self._gpc.fit(self._X, self._y)
             # FIXME: Remove this check
-            assert_equal(np.array(self._gpc.classes_), np.array([0, 1]))
+            assert_equal(np.array(self._gpc.classes_), np.array([-1, 1]))
 
     def predict(self, x, t):
         del t

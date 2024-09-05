@@ -868,7 +868,7 @@ class FeasibilityWeightedLCBSC(LCBSC):
 
     def _compute_current_minimum(self):
         if isinstance(self.model, GPyRegression):
-            _, ymin = minimize(
+            _, self._current_minimum = minimize(
                 self.model.predict_mean,
                 self.model.bounds,
                 grad=self.model.predictive_gradient_mean,
@@ -876,15 +876,14 @@ class FeasibilityWeightedLCBSC(LCBSC):
                 n_start_points=self.n_inits,
                 maxiter=self.max_opt_iters,
                 random_state=self.random_state)
-            self._current_minimum = ymin
         else:
             raise NotImplementedError()
 
-    def acquire(self, n, t=None):
-        logger.debug('Acquiring the next batch of %d values', n)
 
-        self._compute_current_minimum()
-        xhat = self._minimize(t, differentiable=False)
+    def acquire(self, n, t=None, *, update_minimum=True, random_state=None):
+        if update_minimum:
+            self._compute_current_minimum()
+        xhat = self._minimize(t, differentiable=False, random_state=random_state)
 
         logger.debug(f'Acquisition function minimum is at {xhat}, value={self._current_minimum}')
 

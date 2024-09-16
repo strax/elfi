@@ -7,7 +7,10 @@ class FeasibilityEstimator(ABC):
     @abstractmethod
     def predict(self, x, t): ...
 
-    def update(self, params, batch):
+    def update(self, x, y):
+        pass
+
+    def optimize(self):
         pass
 
 

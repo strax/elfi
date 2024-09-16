@@ -29,34 +29,6 @@ def _optimize(step: Callable[[], float], optimizer: Optimizer, *, max_iter=1000,
         prev_objective = objective
     return objective, i + 1
 
-def _train_exact_gp(model: ExactGP, likelihood: Likelihood, max_iter=1000, ftol=1e-6):
-    tx = LBFGS(model.hyperparameters(), max_iter=1)
-    mll = ExactMarginalLogLikelihood(likelihood, model)
-
-    model.train()
-    likelihood.train()
-
-    def step():
-        tx.zero_grad()
-        output = model(*model.train_inputs)
-        objective = -mll(output, model.train_targets).sum()
-        objective.backward()
-        return objective
-
-
-    prev_loss = np.inf
-    for i in range(max_iter):
-        loss = tx.step(step)
-        if prev_loss - loss < ftol:
-            print(f"Early stopping: {prev_loss - loss} < {ftol}")
-            break
-        prev_loss = loss
-
-    print(f"Final loss after optimization ({i} iterations): {loss}")
-
-    model.eval()
-    likelihood.eval()
-
 def _convert_to_tensor(input: Tensor | NDArray, *, dtype = torch.float):
     if not isinstance(input, Tensor):
         input = torch.from_numpy(input)

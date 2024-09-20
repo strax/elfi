@@ -1,25 +1,27 @@
-import numpy as np
-import torch
+import logging
+from typing import Callable
 
 import gpytorch
-import logging
-
-from gpytorch.models import ExactGP
-from gpytorch.likelihoods import DirichletClassificationLikelihood, Likelihood
-from gpytorch.means import ZeroMean, ConstantMean
-from gpytorch.kernels import MaternKernel, RBFKernel, ScaleKernel
+import numpy as np
+import torch
 from gpytorch.distributions import MultivariateNormal
+from gpytorch.kernels import MaternKernel, RBFKernel, RQKernel, ScaleKernel
+from gpytorch.likelihoods import DirichletClassificationLikelihood
+from gpytorch.means import ConstantMean, ZeroMean
 from gpytorch.mlls import ExactMarginalLogLikelihood
-from torch.optim import LBFGS, Optimizer
-from torch import Tensor
-from typing import Callable
+from gpytorch.models import ExactGP
 from numpy.typing import NDArray
+from torch import Tensor
+from torch.optim import LBFGS, Optimizer
 
 from . import FeasibilityEstimator
 
 logger = logging.getLogger(__name__)
 
-def _optimize(step: Callable[[], float], optimizer: Optimizer, *, max_iter=1000, ftol=1e-6) -> tuple[float, int]:
+
+def _optimize(
+    step: Callable[[], float], optimizer: Optimizer, *, max_iter=1000, ftol=1e-6
+) -> tuple[float, int]:
     prev_objective = torch.inf
     for i in range(max_iter):
         objective = optimizer.step(step)
@@ -29,10 +31,12 @@ def _optimize(step: Callable[[], float], optimizer: Optimizer, *, max_iter=1000,
         prev_objective = objective
     return objective, i + 1
 
-def _convert_to_tensor(input: Tensor | NDArray, *, dtype = torch.float):
+
+def _convert_to_tensor(input: Tensor | NDArray, *, dtype=torch.float) -> Tensor:
     if not isinstance(input, Tensor):
         input = torch.from_numpy(input)
     return input.to(dtype)
+
 
 class BinaryDirichletGPC(ExactGP):
     def __init__(self, X: Tensor, y: Tensor):
@@ -62,14 +66,16 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
     model: BinaryDirichletGPC | None = None
     optimize_after_update: bool
 
-    def __init__(self, *, optimize_after_update = False):
+    def __init__(self, *, optimize_after_update=False):
         self.optimize_after_update = optimize_after_update
 
     def _init_model(self):
         if not (0 < self.y.count_nonzero() < self.y.numel()):
-            logger.debug('Skipping model initialization due to not having seen both failed/succeeded observations')
+            logger.debug(
+                "Skipping model initialization due to not having seen both failed/succeeded observations"
+            )
             return
-        logger.debug('(Re)initializing model')
+        logger.debug("(Re)initializing model")
         self.model = BinaryDirichletGPC(self.X, self.y)
         self._optimize_hyperparameters()
         return self.model
@@ -101,14 +107,14 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
     def predict(self, x: NDArray, t: int):
         del t
         if self.model is None:
-            return 1.
+            return 1.0
 
         x = _convert_to_tensor(np.atleast_2d(x))
         with gpytorch.settings.fast_computations():
             predictive = self.model(x)
             # Approximate eq. 8
             p_failure, _ = predictive.sample(torch.Size((256,))).softmax(1).mean(0)
-            return 1. - p_failure.numpy(force=True)
+            return 1.0 - p_failure.numpy(force=True)
 
     def update(self, x: NDArray, y: NDArray):
         y = np.isfinite(y)

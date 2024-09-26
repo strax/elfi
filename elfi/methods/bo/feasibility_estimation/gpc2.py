@@ -32,22 +32,22 @@ def _optimize(
     return objective, i + 1
 
 
-def _convert_to_tensor(input: Tensor | NDArray, *, dtype=torch.float) -> Tensor:
+def _as_tensor(input: Tensor | NDArray) -> Tensor:
     if not isinstance(input, Tensor):
         input = torch.from_numpy(input)
-    return input.to(dtype)
+    return input
 
 
 class BinaryDirichletGPC(ExactGP):
     def __init__(self, X: Tensor, y: Tensor):
         y = y.to(torch.int)
-        likelihood = DirichletClassificationLikelihood(y)
+        likelihood = DirichletClassificationLikelihood(y, dtype=torch.double)
         assert likelihood.num_classes == 2
         super().__init__(X, likelihood.transformed_targets, likelihood)
         self.likelihood = likelihood
         batch_shape = torch.Size((2,))
-        self.mean = ConstantMean(batch_shape=batch_shape)
-        self.cov = ScaleKernel(MaternKernel(5/2, batch_shape=batch_shape), batch_shape=batch_shape)
+        self.mean = ConstantMean(batch_shape=batch_shape).double()
+        self.cov = ScaleKernel(MaternKernel(5/2, batch_shape=batch_shape).double(), batch_shape=batch_shape).double()
 
     def forward(self, x: Tensor):
         mean, cov = self.mean(x), self.cov(x)
@@ -56,7 +56,7 @@ class BinaryDirichletGPC(ExactGP):
     def set_train_data(self, inputs: Tensor, targets: Tensor):
         X, y = inputs, targets.to(torch.int)
 
-        self.likelihood = DirichletClassificationLikelihood(y)
+        self.likelihood = DirichletClassificationLikelihood(y, dtype=torch.double)
         super().set_train_data(X, self.likelihood.transformed_targets, strict=False)
 
 
@@ -109,7 +109,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
         if self.model is None:
             return 1.0
 
-        x = _convert_to_tensor(np.atleast_2d(x))
+        x = _as_tensor(np.atleast_2d(x)).double()
         with gpytorch.settings.fast_computations():
             predictive = self.model(x)
             # Approximate eq. 8
@@ -118,8 +118,8 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
 
     def update(self, x: NDArray, y: NDArray):
         y = np.isfinite(y)
-        X = _convert_to_tensor(np.atleast_2d(x))
-        y = _convert_to_tensor(np.atleast_1d(y), dtype=torch.bool)
+        X = _as_tensor(np.atleast_2d(x)).double()
+        y = _as_tensor(np.atleast_1d(y)).bool()
 
         if self.X is None:
             self.X = X

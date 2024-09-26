@@ -110,7 +110,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
             return 1.0
 
         x = _as_tensor(np.atleast_2d(x)).double()
-        with gpytorch.settings.fast_computations():
+        with gpytorch.settings.fast_computations(False, False, False):
             predictive = self.model(x)
             # Approximate eq. 8
             p_failure, _ = predictive.sample(torch.Size((256,))).softmax(1).mean(0)

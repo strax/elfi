@@ -66,15 +66,13 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
     model: BinaryDirichletGPC | None = None
     optimize_after_update: bool
 
-    def __init__(self, *, optimize_after_update=False):
-        self.optimize_after_update = optimize_after_update
+    _prev_reopt_nobs: int = 0
+
+    def __init__(self, *, reoptimization_interval=10, fast_predictions=True):
+        self.reopt_interval = reoptimization_interval
+        self.fast_predictions = fast_predictions
 
     def _init_model(self):
-        if not (0 < self.y.count_nonzero() < self.y.numel()):
-            logger.debug(
-                "Skipping model initialization due to not having seen both failed/succeeded observations"
-            )
-            return
         logger.debug("(Re)initializing model")
         self.model = BinaryDirichletGPC(self.X, self.y)
         self._optimize_hyperparameters()
@@ -112,8 +110,13 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
         x = _as_tensor(np.atleast_2d(x)).double()
         with gpytorch.settings.fast_computations(False, False, False):
             predictive = self.model(x)
-            # Approximate eq. 8
-            p_failure, _ = predictive.sample(torch.Size((256,))).softmax(1).mean(0)
+            if self.fast_predictions:
+                f = predictive.mean[0] - predictive.mean[1]
+                v = predictive.variance[0] + predictive.variance[1]
+                p_failure = torch.sigmoid(f / torch.sqrt(1 + torch.pi / 8 * v))
+            else:
+                # Approximate eq. 8
+                p_failure, _ = predictive.sample(torch.Size((256,))).softmax(1).mean(0)
             return 1.0 - p_failure.numpy(force=True)
 
     def update(self, x: NDArray, y: NDArray):
@@ -121,6 +124,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
         X = _as_tensor(np.atleast_2d(x)).double()
         y = _as_tensor(np.atleast_1d(y)).bool()
 
+        # Update observations
         if self.X is None:
             self.X = X
             self.y = y
@@ -128,17 +132,34 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
             self.X = torch.cat((self.X, X), 0)
             self.y = torch.cat((self.y, y), 0)
 
-        if self.model is None or self.optimize_after_update:
-            logger.debug("Update caused model to be recreated")
-            self._init_model()
+        # Dirichlet GPC needs observations from both classes to function
+        if not (0 < self.y.count_nonzero() < self.y.numel()):
+            logger.debug(
+                "Skipping model initialization due to not having seen both failed/succeeded observations"
+            )
+            return
+
+        if self.model is None or self._should_reopt():
+            self._optimize()
+            self._prev_reopt_nobs = self.y.numel()
         else:
-            logger.debug("Updating GPC posterior")
+            n_succeeded = torch.count_nonzero(self.y).item()
+            n_failed = torch.numel(self.y) - n_succeeded
+            logger.debug(
+                "Updating GPC posterior (succeeded: %d, failed: %d, total: %d)",
+                n_succeeded,
+                n_failed,
+                n_succeeded + n_failed
+            )
             # TODO: Use `self.model.get_fantasy_model` if/when it is fixed
             self.model.set_train_data(self.X, self.y)
 
-    def optimize(self):
-        # If `optimize_after_update` is set, the hyperparameters are already optimized
-        if not self.optimize_after_update:
-            # Recreating the whole model is a bit inefficient, but
-            # hyperparameter optimization does not work if resumed from a previous state
-            self._init_model()
+    def _should_reopt(self) -> bool:
+        nobs_since_reopt = self.y.numel() - self._prev_reopt_nobs
+        return nobs_since_reopt > self.reopt_interval
+
+    def _optimize(self):
+        logger.debug("Reoptimizing")
+        # Recreating the whole model is a bit inefficient, but hyperparameter optimization does not
+        # work if resumed from a previous state
+        self._init_model()

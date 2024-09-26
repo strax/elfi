@@ -265,8 +265,6 @@ class BayesianOptimization(ParameterInference):
         self._report_batch(batch_index, params, target_batch)
 
         optimize = self._should_optimize()
-        if optimize and self.feasibility_estimator is not None:
-            self.feasibility_estimator.optimize()
         self.target_model.update(params, target_batch, optimize)
         if optimize:
             self.state['last_GP_update'] = self.target_model.n_evidence

@@ -81,12 +81,11 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
             objective = -mll(output, model.train_targets).sum()
             return objective
 
-        with gpytorch.settings.deterministic_probes(True):
-            time_begin = time.monotonic()
-            loss = optimizer.step(step)
-            time_end = time.monotonic()
-            logger.debug("Optimized hyperparameters in %.4fs: MLL = %.6f", time_end - time_begin, loss)
-            assert torch.all(torch.isfinite(loss)), "Optimization resulted in nonfinite parameters"
+        time_begin = time.monotonic()
+        loss = optimizer.step(step)
+        time_end = time.monotonic()
+        logger.debug("Optimized hyperparameters in %.4fs: MLL = %.6f", time_end - time_begin, loss)
+        assert torch.all(torch.isfinite(loss)), "Optimization resulted in nonfinite parameters"
 
         model.eval()
         likelihood.eval()

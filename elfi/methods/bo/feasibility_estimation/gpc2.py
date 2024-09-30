@@ -19,10 +19,12 @@ from . import FeasibilityEstimator
 
 logger = logging.getLogger(__name__)
 
+
 def _as_tensor(input: Tensor | NDArray) -> Tensor:
     if not isinstance(input, Tensor):
         input = torch.from_numpy(input)
     return input
+
 
 def _approx_sigmoid_gaussian_conv(mu: Tensor, sigma2: Tensor) -> Tensor:
     return torch.sigmoid(mu / torch.sqrt(1 + torch.pi / 8 * sigma2))
@@ -37,7 +39,10 @@ class BinaryDirichletGPC(ExactGP):
         self.likelihood = likelihood
         batch_shape = torch.Size((2,))
         self.mean = ConstantMean(batch_shape=batch_shape).double()
-        self.cov = ScaleKernel(MaternKernel(5/2, batch_shape=batch_shape).double(), batch_shape=batch_shape).double()
+        self.cov = ScaleKernel(
+            MaternKernel(5 / 2, batch_shape=batch_shape).double(),
+            batch_shape=batch_shape,
+        ).double()
 
     def forward(self, x: Tensor):
         mean, cov = self.mean(x), self.cov(x)
@@ -88,8 +93,14 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
         time_begin = time.monotonic()
         loss = optimizer.step(step)
         time_end = time.monotonic()
-        logger.debug("Optimized hyperparameters in %.4fs: MLL = %.6f", time_end - time_begin, loss)
-        assert torch.all(torch.isfinite(loss)), "Optimization resulted in nonfinite parameters"
+        logger.debug(
+            "Optimized hyperparameters in %.4fs: MLL = %.6f",
+            time_end - time_begin,
+            loss,
+        )
+        assert torch.all(
+            torch.isfinite(loss)
+        ), "Optimization resulted in nonfinite parameters"
 
         model.eval()
         likelihood.eval()
@@ -141,7 +152,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
                 "Updating GPC posterior (succeeded: %d, failed: %d, total: %d)",
                 n_succeeded,
                 n_failed,
-                n_succeeded + n_failed
+                n_succeeded + n_failed,
             )
             # TODO: Use `self.model.get_fantasy_model` if/when it is fixed
             self.model.set_train_data(self.X, self.y)

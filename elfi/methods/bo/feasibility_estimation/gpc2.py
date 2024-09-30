@@ -105,12 +105,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
         model.eval()
         likelihood.eval()
 
-    @torch.inference_mode
-    def predict(self, x: NDArray):
-        if self.model is None:
-            return 1.0
-
-        x = _as_tensor(np.atleast_2d(x)).double()
+    def _predict_impl(self, x: Tensor) -> Tensor:
         with gpytorch.settings.fast_computations(False, False, False):
             predictive = self.model(x)
             if self.fast_predictive_integration:
@@ -120,7 +115,16 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
             else:
                 # Approximate eq. 8
                 p_failure, _ = predictive.sample(torch.Size((256,))).softmax(1).mean(0)
-            return 1.0 - p_failure.numpy(force=True)
+            return p_failure.neg_().add_(1.)
+
+
+    @torch.inference_mode
+    def predict(self, x: NDArray):
+        if self.model is None:
+            return 1.0
+
+        x = _as_tensor(np.atleast_2d(x)).double()
+        return self._predict_impl(x).numpy(force=True)
 
     def update(self, x: NDArray, y: NDArray):
         y = np.isfinite(y)

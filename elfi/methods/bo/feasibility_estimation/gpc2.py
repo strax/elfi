@@ -55,12 +55,13 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
     y: Tensor | None = None
     model: BinaryDirichletGPC | None = None
     optimize_after_update: bool
+    fast_predictive_integration: bool
 
     _prev_reopt_nobs: int = 0
 
-    def __init__(self, *, reoptimization_interval=10, fast_predictions=True):
+    def __init__(self, *, reoptimization_interval=10, fast_predictive_integration=True):
         self.reopt_interval = reoptimization_interval
-        self.fast_predictions = fast_predictions
+        self.fast_predictive_integration = fast_predictive_integration
 
     def _init_model(self):
         logger.debug("(Re)initializing model")
@@ -102,7 +103,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
         x = _as_tensor(np.atleast_2d(x)).double()
         with gpytorch.settings.fast_computations(False, False, False):
             predictive = self.model(x)
-            if self.fast_predictions:
+            if self.fast_predictive_integration:
                 mu = predictive.mean[0] - predictive.mean[1]
                 sigma2 = predictive.variance[0] + predictive.variance[1]
                 p_failure = _approx_sigmoid_gaussian_conv(mu, sigma2)

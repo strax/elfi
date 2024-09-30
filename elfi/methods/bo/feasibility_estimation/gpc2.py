@@ -95,8 +95,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
         likelihood.eval()
 
     @torch.inference_mode
-    def predict(self, x: NDArray, t: int):
-        del t
+    def predict(self, x: NDArray):
         if self.model is None:
             return 1.0
 

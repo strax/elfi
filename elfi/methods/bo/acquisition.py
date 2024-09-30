@@ -851,7 +851,7 @@ class FeasibilityWeightedLCBSC(LCBSC):
         ymin = self._current_minimum
         assert np.isfinite(ymin)
 
-        p_feasible = np.reshape(self.estimator.predict(x, t), np.shape(yhat))
+        p_feasible = np.reshape(self.estimator.predict(x), np.shape(yhat))
         return np.where(
             yhat < ymin,
             ymin - (ymin - yhat) * p_feasible,

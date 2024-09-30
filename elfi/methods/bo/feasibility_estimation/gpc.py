@@ -49,9 +49,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
             # FIXME: Remove this check
             assert_equal(np.array(self._gpc.classes_), np.array([-1, 1]))
 
-    def predict(self, x, t):
-        del t
-
+    def predict(self, x):
         x = np.asarray(x)
         *batch_dims, input_dim = np.shape(x)
         if self._is_fitted:

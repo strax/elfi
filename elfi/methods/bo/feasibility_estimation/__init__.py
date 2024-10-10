@@ -10,6 +10,13 @@ class FeasibilityEstimator(ABC):
     def update(self, x, y):
         pass
 
+    @property
+    def is_differentiable(self) -> bool:
+        return False
+
+    def predict_grad(self, x):
+        raise NotImplementedError
+
 class OracleFeasibilityEstimator(FeasibilityEstimator):
     def __init__(self, func):
         self.func = func

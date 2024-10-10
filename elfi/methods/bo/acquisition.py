@@ -295,6 +295,16 @@ class LCBSC(AcquisitionBase):
         value = grad_mean - 0.5 * grad_var * np.sqrt(self._beta(t) / var)
         return value
 
+    def evaluate_with_gradient(self, x, t=None):
+        beta = self._beta(t)
+
+        mean, var = self.model.predict(x, noiseless=True)
+        value = mean - np.sqrt(beta * var)
+
+        grad_mean, grad_var = self.model.predictive_gradients(x)
+        grad_value = grad_mean - 0.5 * grad_var * np.sqrt(self._beta(t) / var)
+        return value, grad_value
+
 
 class MaxVar(AcquisitionBase):
     r"""The maximum variance acquisition method.
@@ -843,32 +853,73 @@ class FeasibilityWeightedLCBSC(LCBSC):
     def __init__(self, estimator: FeasibilityEstimator, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.estimator = estimator
-        self._current_minimum = np.nan
+        self._cached_min_mean = np.nan
 
     def evaluate(self, x, t):
-        yhat = super().evaluate(x, t)
+        gamma = self._cached_min_mean
+        assert np.isfinite(gamma)
 
-        ymin = self._current_minimum
-        assert np.isfinite(ymin)
+        a = super().evaluate(x, t)
 
-        p_feasible = np.reshape(self.estimator.predict(x), np.shape(yhat))
+        if np.all(a >= gamma):
+            return a
+
+        pf = np.reshape(self.estimator.predict(x), np.shape(a))
         return np.where(
-            yhat < ymin,
-            ymin - (ymin - yhat) * p_feasible,
-            yhat
+            a < gamma,
+            gamma - (gamma - a) * pf,
+            a
         )
 
     def evaluate_unweighted(self, x, t):
         return super().evaluate(x, t)
 
+    def evaluate_with_gradient(self, x, t):
+        if not self.estimator.is_differentiable:
+            raise NotImplementedError()
+
+        gamma = self._cached_min_mean
+        assert np.isfinite(gamma)
+
+        a, a_dx = super().evaluate_with_gradient(x, t)
+
+        if np.all(a >= gamma):
+            return a, a_dx
+
+        pf = np.reshape(self.estimator.predict(x), np.shape(a))
+        pf_dx = self.estimator.predict_grad(x)
+
+        r = np.where(a < gamma, gamma - (gamma - a) * pf, a)
+        r_dx = np.where(a < gamma, pf * a_dx + (a - gamma) * pf_dx, a_dx)
+
+        return r, r_dx
+
     def evaluate_gradient(self, x, t=None):
-        del x, t
-        # TODO: Support differentiable failure estimators, such as GPCs
-        raise NotImplementedError()
+        _, r_dx = self.evaluate_with_gradient(x, t)
+        return r_dx
+
+    def _minimize_value_and_grad(self, t, *, random_state=None):
+        assert self.constraints is None
+
+        if random_state is None:
+            random_state = self.random_state
+
+        xhat, _ = minimize(
+            partial(self.evaluate_with_gradient, t=t),
+            self.model.bounds,
+            method='L-BFGS-B',
+            grad=True,
+            prior=self.prior,
+            n_start_points=self.n_inits,
+            maxiter=self.max_opt_iters,
+            random_state=random_state
+        )
+
+        return xhat
 
     def _compute_current_minimum(self):
         if isinstance(self.model, GPyRegression):
-            _, self._current_minimum = minimize(
+            _, self._cached_min_mean = minimize(
                 self.model.predict_mean,
                 self.model.bounds,
                 grad=self.model.predictive_gradient_mean,
@@ -883,8 +934,15 @@ class FeasibilityWeightedLCBSC(LCBSC):
     def acquire(self, n, t=None, *, update_minimum=True, random_state=None):
         if update_minimum:
             self._compute_current_minimum()
-        xhat = self._minimize(t, differentiable=False, random_state=random_state)
+        if self.estimator.is_differentiable and self.constraints is None:
+            xhat = self._minimize_value_and_grad(t, random_state=random_state)
+        else:
+            xhat = self._minimize(
+                t,
+                differentiable=self.estimator.is_differentiable,
+                random_state=random_state
+            )
 
-        logger.debug(f'Acquisition function minimum is at {xhat}, value={self._current_minimum}')
+        logger.debug(f'Acquisition function minimum is at {xhat}, value={self._cached_min_mean}')
 
         return np.tile(xhat, (n, 1))

@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Callable
+from typing import Tuple
 
 import gpytorch
 import numpy as np
@@ -13,6 +13,7 @@ from gpytorch.mlls import ExactMarginalLogLikelihood
 from gpytorch.models import ExactGP
 from numpy.typing import NDArray
 from torch import Tensor
+from torch.autograd.functional import jacobian
 from torchmin import Minimizer
 
 from . import FeasibilityEstimator
@@ -44,8 +45,11 @@ class BinaryDirichletGPC(ExactGP):
             batch_shape=batch_shape,
         ).double()
 
+    def raw_forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
+        return self.mean(x), self.cov(x)
+
     def forward(self, x: Tensor):
-        mean, cov = self.mean(x), self.cov(x)
+        mean, cov = self.raw_forward(x)
         return MultivariateNormal(mean, cov)
 
     def set_train_data(self, inputs: Tensor, targets: Tensor):
@@ -62,6 +66,8 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
     optimize_after_update: bool
     fast_predictive_integration: bool
 
+    _predict_grad_counter: int = 0
+    _predict_counter: int = 0
     _prev_reopt_nobs: int = 0
 
     def __init__(self, *, reoptimization_interval=10, fast_predictive_integration=True):
@@ -108,23 +114,38 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
     def _predict_impl(self, x: Tensor) -> Tensor:
         with gpytorch.settings.fast_computations(False, False, False):
             predictive = self.model(x)
-            if self.fast_predictive_integration:
-                mu = predictive.mean[0] - predictive.mean[1]
-                sigma2 = predictive.variance[0] + predictive.variance[1]
-                p_failure = _approx_sigmoid_gaussian_conv(mu, sigma2)
-            else:
-                # Approximate eq. 8
-                p_failure, _ = predictive.sample(torch.Size((256,))).softmax(1).mean(0)
-            return p_failure.neg_().add_(1.)
+        mu = predictive.mean[0] - predictive.mean[1]
+        sigma2 = predictive.variance[0] + predictive.variance[1]
+        p_failure = _approx_sigmoid_gaussian_conv(mu, sigma2)
+        return 1. - p_failure
+
+    def predict_grad(self, x: NDArray):
+        x = np.atleast_1d(x)
+        assert x.ndim == 1
+
+        self._predict_grad_counter += 1
+
+        if self.model is None:
+            return np.zeros_like(x)
+
+        with torch.enable_grad():
+            x = torch.clone(_as_tensor(x)).double().unsqueeze(0)
+            return jacobian(self._predict_impl, x).numpy(force=True).squeeze()
 
 
-    @torch.inference_mode
+    @torch.no_grad
     def predict(self, x: NDArray):
         if self.model is None:
             return 1.0
 
+        self._predict_counter += 1
+
         x = _as_tensor(np.atleast_2d(x)).double()
         return self._predict_impl(x).numpy(force=True)
+
+    @property
+    def is_differentiable(self):
+        return True
 
     def update(self, x: NDArray, y: NDArray):
         y = np.isfinite(y)

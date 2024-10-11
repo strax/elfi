@@ -5,24 +5,9 @@ from dataclasses import dataclass
 from logging import DEBUG
 from typing import Protocol
 
+from .utils import format_duration_ns
+
 logger = logging.getLogger(__name__)
-
-_MICROSEC_IN_NANOSEC = 1_000
-_MILLISEC_IN_NANOSEC = 1_000_000
-_SEC_IN_NANOSEC = 1_000_000_000
-
-
-def _format_duration(ns):
-    if ns < _MICROSEC_IN_NANOSEC:
-        return f"{ns}ns"
-    if ns < _MILLISEC_IN_NANOSEC:
-        us = ns / _MICROSEC_IN_NANOSEC
-        return f"{us:.3f}µs"
-    if ns < _SEC_IN_NANOSEC:
-        ms = ns / _MILLISEC_IN_NANOSEC
-        return f"{ms:.3f}ms"
-    s = ns / _SEC_IN_NANOSEC
-    return f"{s:.3f}s"
 
 
 class TracingHandler(Protocol):
@@ -31,7 +16,7 @@ class TracingHandler(Protocol):
 
 def _default_tracing_handler(op: str, time_ns: int):
     if logger.isEnabledFor(DEBUG):
-        logger.debug("%s: %s", op, _format_duration(time_ns))
+        logger.debug("%s: %s", op, format_duration_ns(time_ns))
 
 
 @dataclass(slots=True)

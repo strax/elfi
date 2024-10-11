@@ -60,6 +60,25 @@ def is_array(output):
     """Check if `output` behaves as np.array (simple)."""
     return hasattr(output, 'shape') and output.ndim > 0
 
+_MICROSEC_IN_NANOSEC = 1_000
+_MILLISEC_IN_NANOSEC = 1_000_000
+_SEC_IN_NANOSEC = 1_000_000_000
+
+def format_duration_ns(ns: int) -> str:
+    """
+    Format a duration represented by elapsed nanoseconds (integer) to a human-readable string.
+    """
+    if ns < _MICROSEC_IN_NANOSEC:
+        return f"{ns}ns"
+    if ns < _MILLISEC_IN_NANOSEC:
+        us = ns / _MICROSEC_IN_NANOSEC
+        return f"{us:.3f}µs"
+    if ns < _SEC_IN_NANOSEC:
+        ms = ns / _MILLISEC_IN_NANOSEC
+        return f"{ms:.3f}ms"
+    s = ns / _SEC_IN_NANOSEC
+    return f"{s:.3f}s"
+
 
 # NetworkX utils
 

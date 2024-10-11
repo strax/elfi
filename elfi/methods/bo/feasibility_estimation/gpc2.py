@@ -66,8 +66,6 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
     optimize_after_update: bool
     fast_predictive_integration: bool
 
-    _predict_grad_counter: int = 0
-    _predict_counter: int = 0
     _prev_reopt_nobs: int = 0
 
     def __init__(self, *, reoptimization_interval=10, fast_predictive_integration=True):
@@ -123,8 +121,6 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
         x = np.atleast_1d(x)
         assert x.ndim == 1
 
-        self._predict_grad_counter += 1
-
         if self.model is None:
             return np.zeros_like(x)
 
@@ -137,8 +133,6 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
     def predict(self, x: NDArray):
         if self.model is None:
             return 1.0
-
-        self._predict_counter += 1
 
         x = _as_tensor(np.atleast_2d(x)).double()
         return self._predict_impl(x).numpy(force=True)

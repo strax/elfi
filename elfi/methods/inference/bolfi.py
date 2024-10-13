@@ -259,7 +259,7 @@ class BayesianOptimization(ParameterInference):
         self.state['n_evidence'] += batch_size
 
         if batch_size == 0:
-            logger.info("Batch is empty, skipping update")
+            logger.debug("Batch is empty, skipping update")
             return
 
         self._report_batch(batch_index, params, target_batch)

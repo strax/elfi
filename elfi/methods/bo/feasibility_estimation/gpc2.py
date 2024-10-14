@@ -32,14 +32,17 @@ def _approx_sigmoid_gaussian_conv(mu: Tensor, sigma2: Tensor) -> Tensor:
 
 
 class BinaryDirichletGPC(ExactGP):
-    def __init__(self, X: Tensor, y: Tensor):
+    def __init__(self, X: Tensor, y: Tensor, *, constant_mean_func=True):
         y = y.to(torch.int)
         likelihood = DirichletClassificationLikelihood(y, dtype=torch.double)
         assert likelihood.num_classes == 2
         super().__init__(X, likelihood.transformed_targets, likelihood)
         self.likelihood = likelihood
         batch_shape = torch.Size((2,))
-        self.mean = ConstantMean(batch_shape=batch_shape).double()
+        if constant_mean_func:
+            self.mean = ConstantMean(batch_shape=batch_shape).double()
+        else:
+            self.mean = ZeroMean(batch_shape=batch_shape).double()
         self.cov = ScaleKernel(
             MaternKernel(5 / 2, batch_shape=batch_shape).double(),
             batch_shape=batch_shape,
@@ -65,16 +68,18 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
     model: BinaryDirichletGPC | None = None
     optimize_after_update: bool
     fast_predictive_integration: bool
+    constant_mean_func: bool
 
     _prev_reopt_nobs: int = 0
 
-    def __init__(self, *, reoptimization_interval=10, fast_predictive_integration=True):
+    def __init__(self, *, reoptimization_interval=10, fast_predictive_integration=True, constant_mean_func=True):
         self.reopt_interval = reoptimization_interval
         self.fast_predictive_integration = fast_predictive_integration
+        self.constant_mean_func = constant_mean_func
 
     def _init_model(self):
         logger.debug("(Re)initializing model")
-        self.model = BinaryDirichletGPC(self.X, self.y)
+        self.model = BinaryDirichletGPC(self.X, self.y, constant_mean_func=self.constant_mean_func)
         self._optimize_hyperparameters()
         return self.model
 

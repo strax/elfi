@@ -113,7 +113,7 @@ class BolfiPosterior:
         """
         prob = self._unnormalized_loglikelihood(x) + self.prior.logpdf(x)
         if self.feasibility_estimator is not None:
-            prob += np.log(self.feasibility_estimator.predict(x))
+            prob += np.log(self.feasibility_estimator.prob(x))
         return prob
 
     def pdf(self, x):
@@ -146,8 +146,8 @@ class BolfiPosterior:
             self.prior.gradient_logpdf(x)
 
         if self.feasibility_estimator is not None and self.feasibility_estimator.is_differentiable:
-            pf_dx = self.feasibility_estimator.predict_grad(x)
-            pf = self.feasibility_estimator.predict(x)
+            pf_dx = self.feasibility_estimator.grad_prob(x)
+            pf = self.feasibility_estimator.prob(x)
             grad += safe_div(pf_dx, pf)
 
         # nan grads are result from -inf logpdf

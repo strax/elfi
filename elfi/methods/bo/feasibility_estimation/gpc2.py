@@ -5,6 +5,7 @@ from typing import Tuple
 import gpytorch
 import numpy as np
 import torch
+from gpytorch.constraints import GreaterThan
 from gpytorch.distributions import MultivariateNormal
 from gpytorch.kernels import MaternKernel, RBFKernel, RQKernel, ScaleKernel
 from gpytorch.likelihoods import DirichletClassificationLikelihood
@@ -30,6 +31,14 @@ def _as_tensor(input: Tensor | NDArray) -> Tensor:
 def _approx_sigmoid_gaussian_conv(mu: Tensor, sigma2: Tensor) -> Tensor:
     return torch.sigmoid(mu / torch.sqrt(1 + torch.pi / 8 * sigma2))
 
+def _make_gpc_kernel(batch_shape):
+    return ScaleKernel(
+        MaternKernel(
+            5 / 2,
+            batch_shape=batch_shape
+        ).double(),
+        batch_shape=batch_shape,
+    ).double()
 
 class BinaryDirichletGPC(ExactGP):
     def __init__(self, X: Tensor, y: Tensor, *, constant_mean_func=True):
@@ -43,10 +52,7 @@ class BinaryDirichletGPC(ExactGP):
             self.mean = ConstantMean(batch_shape=batch_shape).double()
         else:
             self.mean = ZeroMean(batch_shape=batch_shape).double()
-        self.cov = ScaleKernel(
-            MaternKernel(5 / 2, batch_shape=batch_shape).double(),
-            batch_shape=batch_shape,
-        ).double()
+        self.cov = _make_gpc_kernel(batch_shape)
 
     def raw_forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
         return self.mean(x), self.cov(x)
@@ -122,7 +128,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
         p_failure = _approx_sigmoid_gaussian_conv(mu, sigma2)
         return 1. - p_failure
 
-    def predict_grad(self, x: NDArray):
+    def grad_prob(self, x: NDArray):
         x = np.atleast_1d(x)
         assert x.ndim == 1
 
@@ -135,7 +141,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
 
 
     @torch.no_grad
-    def predict(self, x: NDArray):
+    def prob(self, x: NDArray):
         if self.model is None:
             return 1.0
 

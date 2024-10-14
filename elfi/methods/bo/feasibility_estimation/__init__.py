@@ -22,9 +22,7 @@ class OracleFeasibilityEstimator(FeasibilityEstimator):
         self.func = func
 
     def predict(self, x):
-        # x has shape (...batches, param) but simulators receive a tuple or ndarray with shape (param, ...batches), so swap the position of the param axis
-        x = np.swapaxes(x, -1, 0)
-        return np.float_(self.func(*x))
+        return np.float_(self.func(x))
 
 
 __all__ = ["FeasibilityEstimator", "OracleFeasibilityEstimator"]

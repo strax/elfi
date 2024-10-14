@@ -491,7 +491,7 @@ class BOLFI(BayesianOptimization):
             self.infer(n_evidence, bar=bar)
             return self.extract_posterior(threshold)
 
-    def extract_posterior(self, threshold=None):
+    def extract_posterior(self, threshold=None, *, feasibility_adjustment=False):
         """Return an object representing the approximate posterior.
 
         The approximation is based on surrogate model regression.
@@ -500,6 +500,9 @@ class BOLFI(BayesianOptimization):
         ----------
         threshold: float, optional
             Discrepancy threshold for creating the posterior (log with log discrepancy).
+        feasibility_adjustment: bool, optional
+            If True, return a feasibility-adjusted posterior. Requires BOLFI to be initialized with
+            a feasibility estimator.
 
         Returns
         -------
@@ -509,9 +512,20 @@ class BOLFI(BayesianOptimization):
         if self.state['n_evidence'] == 0:
             raise ValueError(
                 'Model is not fitted yet, please see the `fit` method.')
+        if feasibility_adjustment:
+            feasibility_estimator = self.feasibility_estimator
+            if feasibility_estimator is None:
+                raise ValueError("feasibility_adjustment requires BOLFI to be initialized with a feasibility estimator.")
+        else:
+            feasibility_estimator = None
 
         prior = ModelPrior(self.model, parameter_names=self.target_model.parameter_names)
-        return BolfiPosterior(self.target_model, threshold=threshold, prior=prior)
+        return BolfiPosterior(
+            self.target_model,
+            threshold=threshold,
+            prior=prior,
+            feasibility_estimator=feasibility_estimator
+        )
 
     def sample(self,
                n_samples,
@@ -523,6 +537,7 @@ class BOLFI(BayesianOptimization):
                sigma_proposals=None,
                n_evidence=None,
                verbose=True,
+               feasibility_adjustment=False,
                **kwargs):
         r"""Sample the posterior distribution of BOLFI.
 
@@ -557,6 +572,9 @@ class BOLFI(BayesianOptimization):
             Markov Chain sampler. Defaults to 1/10 of surrogate model bound lengths.
         n_evidence : int
             If the regression model is not fitted yet, specify the amount of evidence
+        feasibility_adjustment : bool, optional
+            If True, sample from the feasibility-adjusted posterior. Requires BOLFI to be
+            initialized with a feasibility estimator.
         verbose : bool
             Print sampler diagnostics to stdout.
 
@@ -572,7 +590,7 @@ class BOLFI(BayesianOptimization):
         if algorithm not in ['nuts', 'metropolis']:
             raise ValueError("Unknown posterior sampler.")
 
-        posterior = self.extract_posterior(threshold)
+        posterior = self.extract_posterior(threshold, feasibility_adjustment=feasibility_adjustment)
         warmup = warmup or n_samples // 2
 
         # Unless given, select the evidence points with smallest discrepancy

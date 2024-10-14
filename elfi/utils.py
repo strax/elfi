@@ -25,7 +25,6 @@ def scipy_from_str(name):
     name = SCIPY_ALIASES.get(name, name)
     return getattr(ss, name)
 
-
 def random_seed():
     """Extract the seed from numpy RandomState.
 
@@ -59,6 +58,12 @@ def args_to_tuple(*args):
 def is_array(output):
     """Check if `output` behaves as np.array (simple)."""
     return hasattr(output, 'shape') and output.ndim > 0
+
+@np.errstate(divide='ignore')
+def safe_div(a, b):
+    """Return `a / b` if `b != 0`, 0 otherwise."""
+    return np.where(b != 0, a / b, 0)
+
 
 _MICROSEC_IN_NANOSEC = 1_000
 _MILLISEC_IN_NANOSEC = 1_000_000

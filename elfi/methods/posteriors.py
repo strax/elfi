@@ -10,9 +10,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as ss
 
+from elfi.methods.bo.feasibility_estimation import FeasibilityEstimator
 from elfi.methods.bo.utils import minimize
 from elfi.model.extensions import ModelPrior
 from elfi.visualization.visualization import ProgressBar
+from elfi.utils import safe_div
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +40,16 @@ class BolfiPosterior:
 
     """
 
-    def __init__(self, model, threshold=None, prior=None, n_inits=10, max_opt_iters=1000, seed=0):
+    def __init__(
+        self,
+        model,
+        threshold=None,
+        prior=None,
+        n_inits=10,
+        max_opt_iters=1000,
+        seed=0,
+        feasibility_estimator: FeasibilityEstimator | None = None
+    ):
         """Initialize a BOLFI posterior.
 
         Parameters
@@ -51,6 +62,8 @@ class BolfiPosterior:
         prior : ScipyLikeDistribution, optional
             By default uniform distribution within model bounds.
         seed : int, optional
+        feasibility_estimator: elfi.bo.feasibility_estimation.FeasibilityEstimator, optional
+            Feasibility estimator to adjust the posterior density.
 
         """
         super(BolfiPosterior, self).__init__()
@@ -59,6 +72,7 @@ class BolfiPosterior:
         self.random_state = np.random.RandomState(seed)
         self.n_inits = n_inits
         self.max_opt_iters = max_opt_iters
+        self.feasibility_estimator = feasibility_estimator
 
         self.prior = prior
         self.dim = self.model.input_dim
@@ -97,7 +111,10 @@ class BolfiPosterior:
         float
 
         """
-        return self._unnormalized_loglikelihood(x) + self.prior.logpdf(x)
+        prob = self._unnormalized_loglikelihood(x) + self.prior.logpdf(x)
+        if self.feasibility_estimator is not None:
+            prob += np.log(self.feasibility_estimator.predict(x))
+        return prob
 
     def pdf(self, x):
         """Return the unnormalized posterior pdf at x.
@@ -125,12 +142,17 @@ class BolfiPosterior:
         np.array
 
         """
-        grads = self._gradient_unnormalized_loglikelihood(x) + \
+        grad = self._gradient_unnormalized_loglikelihood(x) + \
             self.prior.gradient_logpdf(x)
+
+        if self.feasibility_estimator is not None and self.feasibility_estimator.is_differentiable:
+            pf_dx = self.feasibility_estimator.predict_grad(x)
+            pf = self.feasibility_estimator.predict(x)
+            grad += safe_div(pf_dx, pf)
 
         # nan grads are result from -inf logpdf
         # return np.where(np.isnan(grads), 0, grads)[0]
-        return grads
+        return grad
 
     def _unnormalized_loglikelihood(self, x):
         x = np.asanyarray(x)

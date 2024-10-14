@@ -18,11 +18,21 @@ class FeasibilityEstimator(ABC):
         raise NotImplementedError
 
 class OracleFeasibilityEstimator(FeasibilityEstimator):
-    def __init__(self, func):
+    def __init__(self, func, grad = None):
         self.func = func
+        self.grad = grad
 
     def predict(self, x):
         return np.float_(self.func(x))
+
+    @property
+    def is_differentiable(self):
+        return self.grad is not None
+
+    def predict_grad(self, x):
+        if self.grad is not None:
+            return self.grad(x)
+        raise NotImplementedError
 
 
 __all__ = ["FeasibilityEstimator", "OracleFeasibilityEstimator"]

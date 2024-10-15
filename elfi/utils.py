@@ -64,6 +64,10 @@ def safe_div(a, b):
     """Return `a / b` if `b != 0`, 0 otherwise."""
     return np.where(b != 0, a / b, 0)
 
+@np.errstate(divide='ignore')
+def logp(x):
+    """Same as `np.log(x)`, but does not warn if `x` is zero."""
+    return np.log(x)
 
 _MICROSEC_IN_NANOSEC = 1_000
 _MILLISEC_IN_NANOSEC = 1_000_000

@@ -886,8 +886,8 @@ class FeasibilityWeightedLCBSC(LCBSC):
         if np.all(a >= gamma):
             return a, a_dx
 
-        pf = np.reshape(self.estimator.prob(x), np.shape(a))
-        pf_dx = self.estimator.grad_prob(x)
+        pf, pf_dx = self.estimator.prob_and_grad(x)
+        pf = np.reshape(pf, np.shape(a))
 
         r = np.where(a < gamma, gamma - (gamma - a) * pf, a)
         r_dx = np.where(a < gamma, pf * a_dx + (a - gamma) * pf_dx, a_dx)

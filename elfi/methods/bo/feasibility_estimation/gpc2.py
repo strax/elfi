@@ -120,7 +120,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
         model.eval()
         likelihood.eval()
 
-    def _predict_impl(self, x: Tensor) -> Tensor:
+    def _prob(self, x: Tensor) -> Tensor:
         with gpytorch.settings.fast_computations(False, False, False):
             predictive = self.model(x)
         mu = predictive.mean[0] - predictive.mean[1]
@@ -137,7 +137,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
 
         with torch.enable_grad():
             x = torch.clone(_as_tensor(x)).double().unsqueeze(0)
-            return jacobian(self._predict_impl, x).numpy(force=True).squeeze()
+            return jacobian(self._prob, x).numpy(force=True).squeeze()
 
 
     @torch.no_grad
@@ -146,7 +146,7 @@ class GPCFeasibilityEstimator(FeasibilityEstimator):
             return 1.0
 
         x = _as_tensor(np.atleast_2d(x)).double()
-        return self._predict_impl(x).numpy(force=True)
+        return self._prob(x).numpy(force=True)
 
     @property
     def is_differentiable(self):

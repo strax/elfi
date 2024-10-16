@@ -501,8 +501,8 @@ class BOLFI(BayesianOptimization):
         threshold: float, optional
             Discrepancy threshold for creating the posterior (log with log discrepancy).
         feasibility_adjustment: bool, optional
-            If True, return a feasibility-adjusted posterior. Requires BOLFI to be initialized with
-            a feasibility estimator.
+            If True, return a feasibility-adjusted posterior. This only has an effect if BOLFI is
+            configured to use a feasibility estimator.
 
         Returns
         -------
@@ -514,8 +514,6 @@ class BOLFI(BayesianOptimization):
                 'Model is not fitted yet, please see the `fit` method.')
         if feasibility_adjustment:
             feasibility_estimator = self.feasibility_estimator
-            if feasibility_estimator is None:
-                raise ValueError("feasibility_adjustment requires BOLFI to be initialized with a feasibility estimator.")
         else:
             feasibility_estimator = None
 
@@ -573,8 +571,8 @@ class BOLFI(BayesianOptimization):
         n_evidence : int
             If the regression model is not fitted yet, specify the amount of evidence
         feasibility_adjustment : bool, optional
-            If True, sample from the feasibility-adjusted posterior. Requires BOLFI to be
-            initialized with a feasibility estimator.
+            If True, sample from the feasibility-adjusted posterior. This only has an effect if
+            BOLFI is configured to use a feasibility estimator.
         verbose : bool
             Print sampler diagnostics to stdout.
 
